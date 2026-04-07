@@ -6,6 +6,7 @@ import com.newproject.wishlist.dto.WishlistItemResponse;
 import com.newproject.wishlist.events.EventPublisher;
 import com.newproject.wishlist.exception.NotFoundException;
 import com.newproject.wishlist.repository.WishlistItemRepository;
+import com.newproject.wishlist.security.RequestActor;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -16,14 +17,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class WishlistService {
     private final WishlistItemRepository wishlistItemRepository;
     private final EventPublisher eventPublisher;
+    private final RequestActor requestActor;
 
-    public WishlistService(WishlistItemRepository wishlistItemRepository, EventPublisher eventPublisher) {
+    public WishlistService(WishlistItemRepository wishlistItemRepository, EventPublisher eventPublisher, RequestActor requestActor) {
         this.wishlistItemRepository = wishlistItemRepository;
         this.eventPublisher = eventPublisher;
+        this.requestActor = requestActor;
     }
 
     @Transactional(readOnly = true)
     public List<WishlistItemResponse> listByCustomer(Long customerId) {
+        requestActor.assertCustomerAccessIfAuthenticated(customerId);
         return wishlistItemRepository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
             .map(this::toResponse)
             .collect(Collectors.toList());
@@ -31,6 +35,7 @@ public class WishlistService {
 
     @Transactional
     public WishlistItemResponse add(Long customerId, WishlistItemRequest request) {
+        requestActor.assertCustomerAccessIfAuthenticated(customerId);
         WishlistItem item = wishlistItemRepository.findByCustomerIdAndProductId(customerId, request.getProductId())
             .orElseGet(WishlistItem::new);
 
@@ -48,6 +53,7 @@ public class WishlistService {
 
     @Transactional
     public void remove(Long customerId, Long productId) {
+        requestActor.assertCustomerAccessIfAuthenticated(customerId);
         WishlistItem item = wishlistItemRepository.findByCustomerIdAndProductId(customerId, productId)
             .orElseThrow(() -> new NotFoundException("Wishlist item not found"));
 
